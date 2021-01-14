@@ -1,0 +1,199 @@
+{
+    "LEVEL0001": {
+        "level_id": "LEVEL0001",
+        "kind": "NORMAL",
+        "requires": {
+            "player_level": 1,
+            "gold": 0
+        },
+        "born_configs": [
+            {
+                "npc_id": "NPC1001",
+                "delay": 0,
+                "quantity": 10,
+                "interval": 0.5
+            }
+        ],
+        "reward_id": null,
+        "auto_reward": [
+            {
+                "res_type": "GOLD",
+                "res_quantity": 6
+            }
+        ]
+    },
+    "LEVEL0002": {
+        "level_id": "LEVEL0002",
+        "kind": "NORMAL",
+        "requires": {
+            "player_level": 2,
+            "gold": 100
+        },
+        "born_configs": [
+            {
+                "npc_id": "NPC1001",
+                "delay": 0,
+                "quantity": 10,
+                "interval": 0.5
+            }
+        ],
+        "reward_id": null,
+        "auto_reward": [
+            {
+                "res_type": "GOLD",
+                "res_quantity": 14
+            }
+        ]
+    },
+    "LEVEL0003": {
+        "level_id": "LEVEL0003",
+        "kind": "BOSS",
+        "requires": {
+            "player_level": 3,
+            "gold": 1000
+        },
+        "born_configs": [
+            {
+                "npc_id": "NPC1001",
+                "delay": 0,
+                "quantity": 10,
+                "interval": 0.5
+            },
+            {
+                "npc_id": "NPC1002",
+                "delay": 5,
+                "quantity": 1,
+                "interval": 0
+            }
+        ],
+        "reward_id": "RW10001",
+        "auto_reward": [
+            {
+                "res_type": "GOLD",
+                "res_quantity": 15
+            },
+            {
+                "res_type": "GOLD2",
+                "res_quantity": 10
+            },
+            {
+                "res_type": "GOLD3",
+                "res_quantity": 10
+            },
+            {
+                "res_type": "GOLD4",
+                "res_quantity": 15
+            },
+            {
+                "res_type": "GOLD5",
+                "res_quantity": 10
+            }
+        ]
+    },
+    "LEVEL0004": {
+        "level_id": "LEVEL0004",
+        "kind": "NORMAL",
+        "requires": {
+            "player_level": 4,
+            "gold": 1100
+        },
+        "born_configs": [
+            {
+                "npc_id": "NPC1003",
+                "delay": 0,
+                "quantity": 10,
+                "interval": 0.5
+            }
+        ],
+        "reward_id": "RW10002",
+        "auto_reward": [
+            {
+                "res_type": "GOLD",
+                "res_quantity": 16
+            }
+        ]
+    },
+    "LEVEL0005": {
+        "level_id": "LEVEL0005",
+        "kind": "NORMAL",
+        "requires": {
+            "player_level": 5,
+            "gold": 0
+        },
+        "born_configs": [
+            {
+                "npc_id": "NPC1001",
+                "delay": 0,
+                "quantity": 10,
+                "interval": 0.5
+            }
+        ],
+        "reward_id": null,
+        "auto_reward": [
+            {
+                "res_type": "GOLD",
+                "res_quantity": 6
+            }
+        ]
+    },
+    "LEVEL0006": {
+        "level_id": "LEVEL0006",
+        "kind": "NORMAL",
+        "requires": {
+            "player_level": 6,
+            "gold": 100
+        },
+        "born_configs": [
+            {
+                "npc_id": "NPC1001",
+                "delay": 0,
+                "quantity": 10,
+                "interval": 0.5
+            }
+        ],
+        "reward_id": null,
+        "auto_reward": [
+            {
+                "res_type": "GOLD",
+                "res_quantity": 14
+            }
+        ]
+    },
+    "LEVEL0007": {
+        "level_id": "LEVEL0007",
+        "kind": "BOSS",
+        "requires": {
+            "player_level": 7,
+            "gold": 1000
+        },
+        "born_configs": [
+            {
+                "npc_id": "NPC1001",
+                "delay": 0,
+                "quantity": 10,
+                "interval": 0.5
+            },
+            {
+                "npc_id": "NPC1002",
+                "delay": 5,
+                "quantity": 1,
+                "interval": 0
+            }
+        ],
+        "reward_id": "RW10001",
+        "auto_reward": [
+            {
+                "res_type": "GOLD",
+                "res_quantity": 15
+            },
+            {
+                "res_type": "GOLD2",
+                "res_quantity": 10
+            },
+            {
+                "res_type": "GOLD5",
+                "res_quantity": 10
+            }
+        ]
+    }
+}
