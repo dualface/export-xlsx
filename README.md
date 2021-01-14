@@ -1,7 +1,7 @@
   # 从 Excel 文件导出 JSON 文件
 
 ```
-COPYRIGHT ALL RESERVED. (C) liaoyulei, https://github.com/dualface
+COPYRIGHT 2021 ALL RESERVED. (C) liaoyulei, https://github.com/dualface
 ```
 
 这个工具的目标：
