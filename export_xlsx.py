@@ -400,8 +400,8 @@ def load_all_rows_in_workbook(filename):
             continue
 
         configSheet = ExcelSheet(sheet)
-        # configSheet.dumps_configs()
-        # configSheet.headers.dumps()
+        configSheet.dumps_configs()
+        configSheet.headers.dumps()
         records = configSheet.load_records()
         indexed = configSheet.make_indexed_records(records)
         name = configSheet.output_filename
