@@ -178,6 +178,9 @@ class ExcelSheet:
         records = []
         cursor = SheetCursor(1, self.first_data_row)
         while cursor.row <= self.sheet.max_row:
+            if self._val(1, cursor.row) is None:
+                cursor.row = cursor.row + 1
+                continue
             record = self._load_record(cursor)
             records.append(record)
         return records
