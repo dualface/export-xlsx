@@ -222,7 +222,7 @@ class ExcelSheet:
             return int(val)
 
         try:
-            return float(val)
+            return round(float(val), 4)
         except:
             pass
         return val
