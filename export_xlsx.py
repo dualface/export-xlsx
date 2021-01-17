@@ -19,7 +19,7 @@ github repo: https://github.com/dualface/export_xlsx
 """
 
 
-class TableHeaderType(Enum):
+class HeaderType(Enum):
     """定义列头的类型"""
     # 正常列头
     NORMAL = EnumAuto()
@@ -33,7 +33,7 @@ class TableHeaderType(Enum):
     ARRAY_CLOSE = EnumAuto()
 
 
-class TableHeader:
+class Header:
     """封装数据表格的单个列头"""
 
     def __init__(self, column, name, type, optional=False):
@@ -49,10 +49,28 @@ class TableHeader:
         self.index_order = 0
 
 
-class TableHeaders:
-    """封装数据表格的列头"""
+class DocumentSchema():
+    """规格定义"""
 
-    def __init__(self):
+    def __init__(self, configs):
+        for key in ("output", "index", "header_row", "first_data_row"):
+            if key not in configs:
+                raise KeyError(f"Schema(): not found {key} in configs")
+
+        # 输出文件名
+        self.output = configs["output"]
+        # 索引列表
+        self.index_names = list(map(str.strip, configs["index"].split(",")))
+        if len(self.index_names) < 1:
+            raise KeyError("must have least one index")
+        if len(self.index_names) > 2:
+            raise KeyError("at most have two indexes")
+
+        # 列头所在行
+        self.header_row = int(configs["header_row"])
+        # 数据起始行
+        self.first_data_row = int(configs["first_data_row"])
+
         # 所有列头 [TableHeader]
         self.headers = []
         # 所有的字典定义 dict_name => [TableHeader, TableHeader, ...]
@@ -65,11 +83,44 @@ class TableHeaders:
         # 添加列头时用于标记最后一个数组列名
         self._last_array_name = None
 
-    def add(self, column, name):
+    def dumps(self):
+        """输出配置信息"""
+        print("Schema:")
+        print(f"    output: {self.output}")
+        print(f"    indexes: {self.index_names}")
+        print(f"    header_row: {self.header_row}")
+        print(f"    first_data_row: {self.first_data_row}")
+        print("")
+
+        indent = ""
+        for header in self.headers:
+            optional = ""
+            if header.optional:
+                optional = " OPTIONAL"
+            if header.type == HeaderType.DICT_OPEN:
+                print(
+                    f"column [{header.column:>2}]: {header.name}{optional} DICT {{")
+                indent = "    "
+            elif header.type == HeaderType.DICT_CLOSE:
+                print(f"column [{header.column:>2}]: }}")
+                indent = ""
+            elif header.type == HeaderType.ARRAY_OPEN:
+                print(
+                    f"column [{header.column:>2}]: {header.name}{optional} ARRAY [")
+                indent = "    "
+            elif header.type == HeaderType.ARRAY_CLOSE:
+                print(f"column [{header.column:>2}]: ]")
+                indent = ""
+            else:
+                print(
+                    f"column [{header.column:>2}]: {indent}{header.name}{optional}")
+        print("")
+
+    def add_header(self, column, name):
         """添加列头"""
         name = name.strip()
         last_char = name[len(name)-1]
-        header_type = TableHeaderType.NORMAL
+        header_type = HeaderType.NORMAL
 
         if last_char == "{" or last_char == "[":
             name = name[0:len(name)-1]
@@ -79,21 +130,21 @@ class TableHeaders:
             name = name[0:len(name)-1]
 
         if last_char == "{":
-            header_type = TableHeaderType.DICT_OPEN
+            header_type = HeaderType.DICT_OPEN
             self._last_dict_name = name
             self.dicts[name] = []
         elif last_char == "}":
-            header_type = TableHeaderType.DICT_CLOSE
+            header_type = HeaderType.DICT_CLOSE
             name = self._last_dict_name
         elif last_char == "[":
-            header_type = TableHeaderType.ARRAY_OPEN
+            header_type = HeaderType.ARRAY_OPEN
             self._last_array_name = name
             self.arrays[name] = []
         elif last_char == "]":
-            header_type = TableHeaderType.ARRAY_CLOSE
+            header_type = HeaderType.ARRAY_CLOSE
             name = self._last_array_name
 
-        header = TableHeader(column, name, header_type, optional=optional)
+        header = Header(column, name, header_type, optional=optional)
         if self._last_dict_name is not None:
             self.dicts[self._last_dict_name].append(header)
         elif self._last_array_name is not None:
@@ -114,32 +165,6 @@ class TableHeaders:
                 header.index_order = index_order
                 index_order = index_order + 1
 
-    def dumps(self):
-        """输出所有列头的信息"""
-        indent = ""
-        for header in self.headers:
-            optional = ""
-            if header.optional:
-                optional = " OPTIONAL"
-            if header.type == TableHeaderType.DICT_OPEN:
-                print(
-                    f"column [{header.column:>2}]: {header.name}{optional} DICT {{")
-                indent = "    "
-            elif header.type == TableHeaderType.DICT_CLOSE:
-                print(f"column [{header.column:>2}]: }}")
-                indent = ""
-            elif header.type == TableHeaderType.ARRAY_OPEN:
-                print(
-                    f"column [{header.column:>2}]: {header.name}{optional} ARRAY [")
-                indent = "    "
-            elif header.type == TableHeaderType.ARRAY_CLOSE:
-                print(f"column [{header.column:>2}]: ]")
-                indent = ""
-            else:
-                print(
-                    f"column [{header.column:>2}]: {indent}{header.name}{optional}")
-        print("")
-
 
 class SheetCursor:
     """封装读取操作的光标位置"""
@@ -153,31 +178,9 @@ class ExcelSheet:
     """封装对 Excel 工作表的操作"""
 
     def __init__(self, sheet):
-        # Excel 工作表
         self.sheet = sheet
-        # 输出文件名
-        self.output_filename = ""
-        # 索引名
-        # [index1, ...]
-        self.index_names = []
-        # 列头所在行
-        self.header_row = 0
-        # 数据起始行
-        self.first_data_row = 0
-        # 所有列头
-        self.headers = TableHeaders()
-
-        # 载入导出配置和列头
-        self._fetch_configs()
+        self.schema = DocumentSchema(self._fetch_configs())
         self._fetch_headers()
-
-    def dumps_configs(self):
-        """输出配置信息"""
-        print("output_filename:", self.output_filename)
-        print("indexes:", self.index_names)
-        print("header_row:", self.header_row)
-        print("first_data_row:", self.first_data_row)
-        print("")
 
     def load_records(self):
         """载入行
@@ -189,7 +192,7 @@ class ExcelSheet:
 
         """
         records = []
-        cursor = SheetCursor(1, self.first_data_row)
+        cursor = SheetCursor(1, self.schema.first_data_row)
         while cursor.row <= self.sheet.max_row:
             if self._val(1, cursor.row) is None:
                 cursor.row = cursor.row + 1
@@ -201,16 +204,17 @@ class ExcelSheet:
     def make_indexed_records(self, records):
         """根据索引构建索引后的分组记录集"""
         indexed_rows = dict()
-        last_index_name = self.index_names[len(self.index_names) - 1]
+        last_index_name = self.schema.index_names[len(
+            self.schema.index_names) - 1]
         for row in records:
             index_value = row[last_index_name]
             indexed_rows[index_value] = row
 
-        if len(self.index_names) == 1:
+        if len(self.schema.index_names) == 1:
             return indexed_rows
 
         primary_indexed_rows = dict()
-        primary_index_name = self.index_names[0]
+        primary_index_name = self.schema.index_names[0]
         for row in records:
             index_value = row[primary_index_name]
             if index_value not in primary_indexed_rows:
@@ -269,24 +273,24 @@ class ExcelSheet:
         # 读取每一个字段对应的值
         cursor.column = 1
         max_move_row = 1
-        for header in self.headers.headers:
+        for header in self.schema.headers:
             if header.column < cursor.column:
                 continue
 
             name = header.name
-            if header.type == TableHeaderType.NORMAL:
+            if header.type == HeaderType.NORMAL:
                 val = self._val(header.column, cursor.row)
                 if (not header.optional) or (val is not None):
                     record[name] = val
                 cursor.column = cursor.column + 1
-            elif header.type == TableHeaderType.DICT_OPEN:
+            elif header.type == HeaderType.DICT_OPEN:
                 val = self._fetch_dict(
-                    self.headers.dicts[name], cursor, header.optional)
+                    self.schema.dicts[name], cursor, header.optional)
                 if (not header.optional) or len(val) > 0:
                     record[name] = val
-            elif header.type == TableHeaderType.ARRAY_OPEN:
+            elif header.type == HeaderType.ARRAY_OPEN:
                 arr, read_rows_count = self._fetch_array(
-                    self.headers.arrays[name], cursor, header.optional)
+                    self.schema.arrays[name], cursor, header.optional)
                 if (not header.optional) or len(arr) > 0:
                     record[name] = arr
                 if read_rows_count > max_move_row:
@@ -372,36 +376,17 @@ class ExcelSheet:
                 configs[key] = int(val)
             else:
                 configs[key] = val
-
-        if ("output" not in configs) or (type(configs["output"]) is not str) or (len(configs["output"]) == 0):
-            raise KeyError("not found config key 'output'")
-        if ("index" not in configs) or (type(configs["index"]) is not str) or (len(configs["index"]) == 0):
-            raise KeyError("not found config key 'index'")
-        if ("header_row" not in configs) or (type(configs["header_row"]) is not int) or (configs["header_row"] <= 0):
-            raise KeyError("not found config key 'header_row'")
-        if ("first_data_row" not in configs) or (type(configs["first_data_row"]) is not int) or (configs["first_data_row"] <= 0):
-            raise KeyError("not found config key 'first_data_row'")
-
-        self.output_filename = configs["output"]
-        self.index_names = list(map(str.strip, configs["index"].split(",")))
-        if len(self.index_names) < 1:
-            raise KeyError(
-                "invalid config key 'index', must have least one name")
-        if len(self.index_names) > 2:
-            raise KeyError("invalid config key 'index', most have two name")
-
-        self.header_row = configs["header_row"]
-        self.first_data_row = configs["first_data_row"]
+        return configs
 
     def _fetch_headers(self):
         """从工作表中读取列头信息"""
         for column in range(1, self.sheet.max_column + 1):
-            name = self._val(column, self.header_row)
+            name = self._val(column, self.schema.header_row)
             if name == None:
                 continue
-            self.headers.add(column, name)
-        for index_name in self.index_names:
-            self.headers.add_index(index_name)
+            self.schema.add_header(column, name)
+        for index_name in self.schema.index_names:
+            self.schema.add_index(index_name)
 
 
 def help():
@@ -439,11 +424,10 @@ def load_all_rows_in_workbook(filename):
             continue
 
         configSheet = ExcelSheet(sheet)
-        configSheet.dumps_configs()
-        configSheet.headers.dumps()
+        configSheet.schema.dumps()
         records = configSheet.load_records()
         indexed = configSheet.make_indexed_records(records)
-        name = configSheet.output_filename
+        name = configSheet.schema.output
         if name in all:
             for key in indexed:
                 all[name][key] = indexed[key]
@@ -458,10 +442,10 @@ def load_all_rows_in_workbook(filename):
 
 def export_all_to_json(all):
     """导出所有数据为 JSON 文件"""
-    for output_filename in all:
-        with open(output_filename, "w") as f:
-            print(f"write file '{output_filename}'")
-            f.write(json.dumps(all[output_filename], indent=4))
+    for output in all:
+        with open(output, "w") as f:
+            print(f"write file '{output}'")
+            f.write(json.dumps(all[output], indent=4))
             print("")
 
 
@@ -472,6 +456,9 @@ def main():
 
     names = sys.argv[1]
     for filename in glob.glob(names):
+        basename = os.path.basename(filename)
+        if basename[0] == "~" or basename[0] == ".":
+            continue
         all = load_all_rows_in_workbook(filename)
         export_all_to_json(all)
 
