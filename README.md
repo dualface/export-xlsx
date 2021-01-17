@@ -28,15 +28,15 @@ Excel 文件的格式要求：
 
 ```
 output: level_configs.json
-index: level_id
+index: levelID
 header_row: 4
 first_data_row: 5
 ```
 
-- `output`: 指定输出的 JSON 文件
-- `index`: 指定输出 JSON 时使用哪些字段进行索引
-- `header_row`: 列头所在的行，定义了每一条数据包含哪些字段
-- `first_data_row`: 数据的开始行
+-   `output`: 指定输出的 JSON 文件
+-   `index`: 指定输出 JSON 时使用哪些字段进行索引
+-   `header_row`: 列头所在的行，定义了每一条数据包含哪些字段
+-   `first_data_row`: 数据的开始行
 
 ~
 
@@ -54,7 +54,7 @@ first_data_row: 5
     #  A         |  B       |  C
     +------------+----------+------------
   1 |  output: level_configs.json
-    |  index: level_id
+    |  index: levelID
     |  header_row: 4
     |  first_data_row: 5
     +------------+----------+------------
@@ -62,7 +62,7 @@ first_data_row: 5
     +------------+----------+------------
   3 |  配置每个级别的关卡会产生多少个 NPC
     +------------+----------+------------
-  4 |  level_id  |  npc_id  |  quantity
+  4 |  levelID   |  NPCID   |  quantity
     +------------+----------+------------
   5 |  LEVEL_01  |  NPC_01  |  100
   6 |  LEVEL_02  |  NPC_02  |  100
@@ -83,11 +83,18 @@ first_data_row: 5
 
 ```json
 "LEVEL_01": {
-    "level_id": "LEVEL_01",
-    "npc_id": "NPC_01",
+    "levelID": "LEVEL_01",
+    "NPCID": "NPC_01",
     "quantity": 100
 }
 ```
+
+默认情况下，单元格中的值按照以下规则转换：
+
+-   数字: 转换为 `number` 数字类型
+-   空白, "null"（不区分大小写）: 转换为 `null` 空类型
+-   "true" / "false"（不区分大小写）: 转换为 `boolean` 布尔类型
+-   其他一律转换为 `string` 字符串类型
 
 所有数据都转换为字典后，再根据导出配置中 `index` 定义的索引，
 提取每一个字典中特定的值作为 `KEY`，生成一个完整的字典。
@@ -99,15 +106,54 @@ first_data_row: 5
 ```json
 {
     "LEVEL_01": {
-        "level_id": "LEVEL_01",
-        "npc_id": "NPC_01",
+        "levelID": "LEVEL_01",
+        "NPCID": "NPC_01",
         "quantity": 100
     },
     "LEVEL_02": {
-        "level_id": "LEVEL_02",
-        "npc_id": "NPC_02",
+        "levelID": "LEVEL_02",
+        "NPCID": "NPC_02",
+        "quantity": 100
+    }
+}
+```
+
+~
+
+
+## 可选的列
+
+如果某个列是可选的，那么可以在列头名字后面加上 `?` 符号。
+
+对于可选的列头，如果行中该列没有填入内容或者填入了 `null`，则字典中不会包含该列。
+
+示例：
+
+```
+  levelID   |  NPCID   |  quantity?
+------------+----------+-------------
+  LEVEL_01  |  NPC_01  |  null
+  LEVEL_02  |  NPC_02  |  100
+  LEVEL_03  |  NPC_03  |  null
+```
+
+输出：
+
+```json
+{
+    "LEVEL_01": {
+        "levelID": "LEVEL_01",
+        "NPCID": "NPC_01"
+    },
+    "LEVEL_02": {
+        "levelID": "LEVEL_02",
+        "NPCID": "NPC_02",
         "quantity": 100
     },
+    "LEVEL_03": {
+        "levelID": "LEVEL_03",
+        "NPCID": "NPC_03"
+    }
 }
 ```
 
@@ -124,60 +170,60 @@ first_data_row: 5
 
 ```
 output: technology_upgrade.json
-index: tech_id, level
+index: techID, level
 header_row: 4
 first_data_row: 5
 
-tech_id  |  level  |  upgrade_cost
----------+---------+----------------
-AAAAAA   |  1      |  100
-AAAAAA   |  2      |  200
-AAAAAA   |  3      |  300
-BBBBBB   |  1      |  100
-BBBBBB   |  2      |  200
-BBBBBB   |  3      |  300
+techID  |  level  |  upgradeCost
+--------+---------+---------------
+AAAAAA  |  1      |  100
+AAAAAA  |  2      |  200
+AAAAAA  |  3      |  300
+BBBBBB  |  1      |  100
+BBBBBB  |  2      |  200
+BBBBBB  |  3      |  300
 ```
 
-- `tech_id`: 科技 ID
-- `level`: 科技的级别
-- `upgrade_cost`: 升级的花费
+-   `techID`: 科技 ID
+-   `level`: 科技的级别
+-   `upgradeCost`: 升级的花费
 
-第一级索引使用 `tech_id` 的值作为 `KEY`，第二级索引使用 `level`。生成的 JSON 如下：
+第一级索引使用 `techID` 的值作为 `KEY`，第二级索引使用 `level`。生成的 JSON 如下：
 
 ```json
 {
     "AAAAAA": {
         "1": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 1,
-            "upgrade_cost": 100
+            "upgradeCost": 100
         },
         "2": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 2,
-            "upgrade_cost": 200
+            "upgradeCost": 200
         },
         "3": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 3,
-            "upgrade_cost": 300
+            "upgradeCost": 300
         }
     },
     "BBBBBB": {
         "1": {
-            "tech_id": "BBBBBB",
+            "techID": "BBBBBB",
             "level": 1,
-            "upgrade_cost": 100
+            "upgradeCost": 100
         },
         "2": {
-            "tech_id": "BBBBBB",
+            "techID": "BBBBBB",
             "level": 2,
-            "upgrade_cost": 200
+            "upgradeCost": 200
         },
         "3": {
-            "tech_id": "BBBBBB",
+            "techID": "BBBBBB",
             "level": 3,
-            "upgrade_cost": 300
+            "upgradeCost": 300
         }
     }
 }
@@ -193,15 +239,15 @@ BBBBBB   |  3      |  300
 
 ```
 output: technology_upgrade.json
-index: tech_id, level
+index: techID, level
 header_row: 4
 first_data_row: 5
 
-tech_id  |  level  |  upgrade_cost{  |  res_type  |  res_quantity  |  }
----------+---------+-----------------+------------+----------------+-----
-AAAAAA   |  1      |  {              |  GOLD      |  100           |  }
-AAAAAA   |  2      |  {              |  GOLD      |  200           |  }
-AAAAAA   |  3      |  {              |  GOLD      |  300           |  }
+techID  |  level  |  upgradeCost{  |  resType  |  resQuantity  |  }
+--------+---------+----------------+-----------+---------------+-----
+AAAAAA  |  1      |  {             |  GOLD     |  100          |  }
+AAAAAA  |  2      |  {             |  GOLD     |  200          |  }
+AAAAAA  |  3      |  {             |  GOLD     |  300          |  }
 ```
 
 生成的 JSON 如下：
@@ -210,44 +256,45 @@ AAAAAA   |  3      |  {              |  GOLD      |  300           |  }
 {
     "AAAAAA": {
         "1": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 1,
-            "upgrade_cost": {
-                "res_type": "GOLD",
-                "res_quantity": 100
+            "upgradeCost": {
+                "resType": "GOLD",
+                "resQuantity": 100
             }
         },
         "2": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 2,
-            "upgrade_cost": {
-                "res_type": "GOLD",
-                "res_quantity": 200
+            "upgradeCost": {
+                "resType": "GOLD",
+                "resQuantity": 200
             }
         },
         "3": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 3,
-            "upgrade_cost": {
-                "res_type": "GOLD",
-                "res_quantity": 300
+            "upgradeCost": {
+                "resType": "GOLD",
+                "resQuantity": 300
             }
-        },
+        }
     }
 }
 ```
 
 定义嵌入字典的规则：
 
--   `upgrade_cost` 字段名后面增加了 `{` 符号，表示这个字段定义了一个嵌入的字典。
+-   `upgradeCost` 字段名后面增加了 `{` 符号，表示这个字段定义了一个嵌入的字典。
 
 -   之后的 `}` 列头表示结束前一个嵌入字典的定义。
 
--   在 `upgrade_cost{` 和 `}` 之间定义的列头，就是嵌入字典的所有字段。
-    -   上述示例中，`res_type` 和 `res_quantity` 就是嵌入字典的所有字段。
+-   在 `upgradeCost{` 和 `}` 之间定义的列头，就是嵌入字典的所有字段。
+    -   上述示例中，`resType` 和 `resQuantity` 就是嵌入字典的所有字段。
 
 -   在填写数据时，每一条数据在字典开始的位置填写 `{`，在结束的位置填写 `}`。
 
+-   如果字典列头为可选，那么空字典将不会被包含在结果中。
 
 ~
 
@@ -257,18 +304,18 @@ AAAAAA   |  3      |  {              |  GOLD      |  300           |  }
 
 ```
 output: technology_upgrade.json
-index: tech_id, level
+index: techID, level
 header_row: 4
 first_data_row: 5
 
-tech_id  |  level  |  upgrade_cost[  |  res_type  |  res_quantity  |  ]
----------+---------+-----------------+------------+----------------+-----
-AAAAAA   |  1      |  {              |  GOLD      |  100           |  }
-AAAAAA   |  2      |  {              |  GOLD      |  200           |
-         |         |                 |  DIAMOND   |  20            |  }
-AAAAAA   |  3      |  {              |  GOLD      |  300           |
-         |         |                 |  DIAMOND   |  30            |
-         |         |                 |  TICKET    |  3             |  }
+techID  |  level  |  upgradeCost[  |  resType  |  resQuantity  |  ]
+--------+---------+----------------+-----------+---------------+-----
+AAAAAA  |  1      |  {             |  GOLD     |  100          |  }
+AAAAAA  |  2      |  {             |  GOLD     |  200          |
+        |         |                |  DIAMOND  |  20           |  }
+AAAAAA  |  3      |  {             |  GOLD     |  300          |
+        |         |                |  DIAMOND  |  30           |
+        |         |                |  TICKET   |  3            |  }
 ```
 
 生成的 JSON 如下：
@@ -277,44 +324,44 @@ AAAAAA   |  3      |  {              |  GOLD      |  300           |
 {
     "AAAAAA": {
         "1": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 1,
-            "upgrade_cost": [
+            "upgradeCost": [
                 {
-                    "res_type": "GOLD",
-                    "res_quantity": 100
+                    "resType": "GOLD",
+                    "resQuantity": 100
                 }
             ]
         },
         "2": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 2,
-            "upgrade_cost": [
+            "upgradeCost": [
                 {
-                    "res_type": "GOLD",
-                    "res_quantity": 200
+                    "resType": "GOLD",
+                    "resQuantity": 200
                 },
                 {
-                    "res_type": "DIAMOND",
-                    "res_quantity": 20
+                    "resType": "DIAMOND",
+                    "resQuantity": 20
                 }
             ]
         },
         "3": {
-            "tech_id": "AAAAAA",
+            "techID": "AAAAAA",
             "level": 3,
-            "upgrade_cost": [
+            "upgradeCost": [
                 {
-                    "res_type": "GOLD",
-                    "res_quantity": 300
+                    "resType": "GOLD",
+                    "resQuantity": 300
                 },
                 {
-                    "res_type": "DIAMOND",
-                    "res_quantity": 30
+                    "resType": "DIAMOND",
+                    "resQuantity": 30
                 },
                 {
-                    "res_type": "TICKET",
-                    "res_quantity": 3
+                    "resType": "TICKET",
+                    "resQuantity": 3
                 }
             ]
         }
@@ -324,12 +371,12 @@ AAAAAA   |  3      |  {              |  GOLD      |  300           |
 
 定义嵌入数组的规则：
 
--   `upgrade_cost` 字段名后面增加了 `[` 符号，表示这个字段定义了一个嵌入的数组。
+-   `upgradeCost` 字段名后面增加了 `[` 符号，表示这个字段定义了一个嵌入的数组。
 
 -   之后的 `]` 列头表示结束前一个嵌入数组的定义。
 
--   在 `upgrade_cost[` 和 `]` 之间定义的列头，就是嵌入数组里每个字典的所有字段。
-    -   上述示例中，`res_type` 和 `res_quantity` 就是嵌入数组里每一个字典的所有字段。
+-   在 `upgradeCost[` 和 `]` 之间定义的列头，就是嵌入数组里每个字典的所有字段。
+    -   上述示例中，`resType` 和 `resQuantity` 就是嵌入数组里每一个字典的所有字段。
 
 -   在填写数据时，每一条数据在字典开始的位置填写 `{`，在结束的位置填写 `}`。
 
@@ -337,5 +384,10 @@ AAAAAA   |  3      |  {              |  GOLD      |  300           |
     -   示例中 `level: 1` 的数据就只定义了一个字典。
     -   示例中 `level: 2` 的数据定义了两个字典，`level: 3` 的数据定义了三个字典。
 
+-   空字典不会被包含在数组中。
+
+-   如果数组列头为可选，那么空数组将不会被包含在结果中。
+
+~
 
 \-EOF\-

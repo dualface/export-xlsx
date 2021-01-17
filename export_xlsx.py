@@ -36,13 +36,15 @@ class TableHeaderType(Enum):
 class TableHeader:
     """封装数据表格的单个列头"""
 
-    def __init__(self, column, name, type):
+    def __init__(self, column, name, type, optional=False):
         # 所在列
         self.column = column
         # 字段名
         self.name = name
         # 列头类型
         self.type = type
+        # 是否是可选列
+        self.optional = optional
         # 是否是索引
         self.index_order = 0
 
@@ -69,9 +71,15 @@ class TableHeaders:
         last_char = name[len(name)-1]
         header_type = TableHeaderType.NORMAL
 
+        if last_char == "{" or last_char == "[":
+            name = name[0:len(name)-1]
+
+        optional = name[len(name)-1] == "?"
+        if optional:
+            name = name[0:len(name)-1]
+
         if last_char == "{":
             header_type = TableHeaderType.DICT_OPEN
-            name = name[0:len(name)-1]
             self._last_dict_name = name
             self.dicts[name] = []
         elif last_char == "}":
@@ -79,14 +87,13 @@ class TableHeaders:
             name = self._last_dict_name
         elif last_char == "[":
             header_type = TableHeaderType.ARRAY_OPEN
-            name = name[0:len(name)-1]
             self._last_array_name = name
             self.arrays[name] = []
         elif last_char == "]":
             header_type = TableHeaderType.ARRAY_CLOSE
             name = self._last_array_name
 
-        header = TableHeader(column, name, header_type)
+        header = TableHeader(column, name, header_type, optional=optional)
         if self._last_dict_name is not None:
             self.dicts[self._last_dict_name].append(header)
         elif self._last_array_name is not None:
@@ -111,20 +118,26 @@ class TableHeaders:
         """输出所有列头的信息"""
         indent = ""
         for header in self.headers:
+            optional = ""
+            if header.optional:
+                optional = " OPTIONAL"
             if header.type == TableHeaderType.DICT_OPEN:
-                print(f"column [{header.column:>2}]: {header.name} DICT {{")
+                print(
+                    f"column [{header.column:>2}]: {header.name}{optional} DICT {{")
                 indent = "    "
             elif header.type == TableHeaderType.DICT_CLOSE:
                 print(f"column [{header.column:>2}]: }}")
                 indent = ""
             elif header.type == TableHeaderType.ARRAY_OPEN:
-                print(f"column [{header.column:>2}]: {header.name} ARRAY [")
+                print(
+                    f"column [{header.column:>2}]: {header.name}{optional} ARRAY [")
                 indent = "    "
             elif header.type == TableHeaderType.ARRAY_CLOSE:
                 print(f"column [{header.column:>2}]: ]")
                 indent = ""
             else:
-                print(f"column [{header.column:>2}]: {indent}{header.name}")
+                print(
+                    f"column [{header.column:>2}]: {indent}{header.name}{optional}")
         print("")
 
 
@@ -215,16 +228,20 @@ class ExcelSheet:
         if val is None:
             return None
         val = str(val).strip()
-        if val.lower() == "null":
+        val_lower = val.lower()
+        if val_lower == "null":
             return None
-
-        if str.isnumeric(val):
+        elif val_lower == "true":
+            return True
+        elif val_lower == "false":
+            return False
+        elif str.isnumeric(val):
             return int(val)
-
-        try:
-            return round(float(val), 4)
-        except:
-            pass
+        else:
+            try:
+                return round(float(val), 4)
+            except:
+                pass
         return val
 
     def _val_with_coordinate(self, column, row):
@@ -258,26 +275,36 @@ class ExcelSheet:
 
             name = header.name
             if header.type == TableHeaderType.NORMAL:
-                record[name] = self._val(header.column, cursor.row)
+                val = self._val(header.column, cursor.row)
+                if (not header.optional) or (val is not None):
+                    record[name] = val
                 cursor.column = cursor.column + 1
             elif header.type == TableHeaderType.DICT_OPEN:
-                record[name] = self._fetch_dict(
-                    self.headers.dicts[name], cursor)
+                val = self._fetch_dict(
+                    self.headers.dicts[name], cursor, header.optional)
+                if (not header.optional) or len(val) > 0:
+                    record[name] = val
             elif header.type == TableHeaderType.ARRAY_OPEN:
-                arr = self._fetch_array(self.headers.arrays[name], cursor)
-                record[name] = arr
-                if len(arr) > max_move_row:
-                    max_move_row = len(arr)
+                arr, read_rows_count = self._fetch_array(
+                    self.headers.arrays[name], cursor, header.optional)
+                if (not header.optional) or len(arr) > 0:
+                    record[name] = arr
+                if read_rows_count > max_move_row:
+                    max_move_row = read_rows_count
 
         cursor.row = cursor.row + max_move_row
         return record
 
-    def _fetch_dict(self, headers, cursor):
+    def _fetch_dict(self, headers, cursor, optional):
         """读取当前行内指定的字典"""
         len_of_headers = len(headers)
+        cursor.column = headers[len_of_headers - 1].column+1
+
         val, coordinate = self._val_with_coordinate(
             headers[0].column, cursor.row)
         if val != "{":
+            if optional:
+                return dict()
             raise TypeError(f"cell at <{coordinate}> is not dict begin")
         val, coordinate = self._val_with_coordinate(
             headers[-1].column, cursor.row)
@@ -287,27 +314,37 @@ class ExcelSheet:
         dict_at_row = dict()
         for i in range(1, len_of_headers - 1):
             header = headers[i]
-            dict_at_row[header.name] = self._val(header.column, cursor.row)
+            val = self._val(header.column, cursor.row)
+            if val is not None:
+                dict_at_row[header.name] = val
 
-        cursor.column = headers[len_of_headers - 1].column+1
         return dict_at_row
 
-    def _fetch_array(self, headers, cursor):
+    def _fetch_array(self, headers, cursor, optional):
         """从光标位置开始读取包含多个字典的数组"""
         len_of_headers = len(headers)
+        cursor.column = headers[len_of_headers - 1].column+1
+
         val, coordinate = self._val_with_coordinate(
             headers[0].column, cursor.row)
         if val != "{" and val != "[":
+            if optional:
+                return [], 1
             raise TypeError(f"cell at <{coordinate}> is not array begin")
 
         arr = []
+        read_rows_count = 0
         data_row = cursor.row
         while data_row <= self.sheet.max_row:
             d = dict()
             for i in range(1, len_of_headers - 1):
                 header = headers[i]
-                d[header.name] = self._val(header.column, data_row)
-            arr.append(d)
+                val = self._val(header.column, data_row)
+                if val is not None:
+                    d[header.name] = val
+            if (len(d) > 0):
+                arr.append(d)
+            read_rows_count = read_rows_count + 1
 
             val = self._val(headers[-1].column, data_row)
             data_row = data_row + 1
@@ -315,8 +352,7 @@ class ExcelSheet:
                 # 数组已经结束
                 break
 
-        cursor.column = headers[len_of_headers - 1].column+1
-        return arr
+        return arr, read_rows_count
 
     def _fetch_configs(self):
         """从工作表中读取导出配置"""
@@ -413,6 +449,9 @@ def load_all_rows_in_workbook(filename):
                 all[name][key] = indexed[key]
         else:
             all[name] = indexed
+
+    if len(all) == 0:
+        print("skipped.")
 
     return all
 
