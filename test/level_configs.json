@@ -6,8 +6,12 @@
             "playerLevel": 1,
             "gold": 0
         },
+        "bornPoints": [
+            "BORN01"
+        ],
         "bornConfigs": [
             {
+                "bornPoint": "BORN01",
                 "NPCID": "NPC1001",
                 "delay": 0,
                 "quantity": 10,
@@ -19,8 +23,7 @@
                 "resType": "GOLD",
                 "resQuantity": 6
             }
-        ],
-        "more": true
+        ]
     },
     "LEVEL0002": {
         "levelID": "LEVEL0002",
@@ -29,8 +32,12 @@
             "playerLevel": 2,
             "gold": 100
         },
+        "bornPoints": [
+            "BORN01"
+        ],
         "bornConfigs": [
             {
+                "bornPoint": "BORN01",
                 "NPCID": "NPC1001",
                 "delay": 0,
                 "quantity": 10,
@@ -43,8 +50,7 @@
                 "resType": "GOLD",
                 "resQuantity": 14
             }
-        ],
-        "more": false
+        ]
     },
     "LEVEL0003": {
         "levelID": "LEVEL0003",
@@ -53,18 +59,31 @@
             "playerLevel": 3,
             "gold": 1000
         },
+        "bornPoints": [
+            "BORN01",
+            "BORN02"
+        ],
         "bornConfigs": [
             {
+                "bornPoint": "BORN01",
                 "NPCID": "NPC1001",
                 "delay": 0,
                 "quantity": 10,
                 "interval": 0.5
             },
             {
+                "bornPoint": "BORN01",
                 "NPCID": "NPC1002",
                 "delay": 5,
                 "quantity": 1,
                 "interval": 0
+            },
+            {
+                "bornPoint": "BORN02",
+                "NPCID": "NPC1001",
+                "delay": 0,
+                "quantity": 10,
+                "interval": 0.5
             }
         ]
     },
@@ -75,8 +94,12 @@
             "playerLevel": 4,
             "gold": 1100
         },
+        "bornPoints": [
+            "BORN01"
+        ],
         "bornConfigs": [
             {
+                "bornPoint": "BORN01",
                 "NPCID": "NPC1003",
                 "delay": 0,
                 "quantity": 10,
