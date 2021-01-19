@@ -245,9 +245,9 @@ first_data_row: 5
 
 techID  |  level  |  upgradeCost{  |  resType  |  resQuantity  |  }
 --------+---------+----------------+-----------+---------------+-----
-AAAAAA  |  1      |  {             |  GOLD     |  100          |  }
-AAAAAA  |  2      |  {             |  GOLD     |  200          |  }
-AAAAAA  |  3      |  {             |  GOLD     |  300          |  }
+AAAAAA  |  1      |             {  |  GOLD     |  100          |  }
+AAAAAA  |  2      |             {  |  GOLD     |  200          |  }
+AAAAAA  |  3      |             {  |  GOLD     |  300          |  }
 ```
 
 生成的 JSON 如下：
@@ -310,10 +310,10 @@ first_data_row: 5
 
 techID  |  level  |  upgradeCost[  |  resType  |  resQuantity  |  ]
 --------+---------+----------------+-----------+---------------+-----
-AAAAAA  |  1      |  {             |  GOLD     |  100          |  }
-AAAAAA  |  2      |  {             |  GOLD     |  200          |
+AAAAAA  |  1      |             {  |  GOLD     |  100          |  }
+AAAAAA  |  2      |             {  |  GOLD     |  200          |
         |         |                |  DIAMOND  |  20           |  }
-AAAAAA  |  3      |  {             |  GOLD     |  300          |
+AAAAAA  |  3      |             {  |  GOLD     |  300          |
         |         |                |  DIAMOND  |  30           |
         |         |                |  TICKET   |  3            |  }
 ```
@@ -385,6 +385,76 @@ AAAAAA  |  3      |  {             |  GOLD     |  300          |
     -   示例中 `level: 2` 的数据定义了两个字典，`level: 3` 的数据定义了三个字典。
 
 -   空字典不会被包含在数组中。
+
+-   如果数组列头为可选，那么空数组将不会被包含在结果中。
+
+~
+
+## 不含字段名的匿名数组
+
+如果记录中的数组只是需要保存不带字段名的值，那么可以将字段定义为匿名数组。
+
+匿名数组以 `#` 开头。该数组中所有字段值都会忽略掉字段名，字段值则会依次添加到数组中。
+
+```
+output: technology_upgrade.json
+index: techID, level
+header_row: 4
+first_data_row: 5
+
+techID  |  level  |  #upgradeCost[  |  resType  |  resQuantity  |  ]
+--------+---------+----------------+-----------+---------------+-----
+AAAAAA  |  1      |              {  |  GOLD     |  100          |  }
+AAAAAA  |  2      |              {  |  GOLD     |  200          |
+        |         |                 |  DIAMOND  |  20           |  }
+AAAAAA  |  3      |              {  |  GOLD     |  300          |
+        |         |                 |  DIAMOND  |  30           |
+        |         |                 |  TICKET   |  3            |  }
+```
+
+
+生成的 JSON 如下：
+
+```json
+{
+    "AAAAAA": {
+        "1": {
+            "techID": "AAAAAA",
+            "level": 1,
+            "upgradeCost": [
+                "GOLD",
+                100
+            ]
+        },
+        "2": {
+            "techID": "AAAAAA",
+            "level": 2,
+            "upgradeCost": [
+                "GOLD",
+                200,
+                "DIAMOND",
+                20
+            ]
+        },
+        "3": {
+            "techID": "AAAAAA",
+            "level": 3,
+            "upgradeCost": [
+                "GOLD",
+                300,
+                "DIAMOND",
+                30,
+                "TICKET",
+                3
+            ]
+        }
+    }
+}
+```
+
+定义匿名数组的规则：
+
+-   空白值或者 `null` 不会被包含在数组中。
 
 -   如果数组列头为可选，那么空数组将不会被包含在结果中。
 

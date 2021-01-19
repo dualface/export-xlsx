@@ -36,7 +36,7 @@ class HeaderType(Enum):
 class Header:
     """封装数据表格的单个列头"""
 
-    def __init__(self, column, name, type, optional=False):
+    def __init__(self, column, name, type, optional=False, anonymous=False):
         # 所在列
         self.column = column
         # 字段名
@@ -47,6 +47,8 @@ class Header:
         self.optional = optional
         # 是否是索引
         self.index_order = 0
+        # 是否是匿名字段
+        self.anonymous = anonymous
 
 
 class DocumentSchema():
@@ -118,8 +120,15 @@ class DocumentSchema():
 
     def add_header(self, column, name):
         """添加列头"""
-        name = name.strip()
+        name = name.strip().replace(" ", "")
+        anonymous = name[0] == "#"
+        if anonymous:
+            name = name[1:]
+
         last_char = name[len(name)-1]
+        if anonymous and last_char != "[":
+            raise TypeError(f"only array can be anonymous")
+
         header_type = HeaderType.NORMAL
 
         if last_char == "{" or last_char == "[":
@@ -144,7 +153,8 @@ class DocumentSchema():
             header_type = HeaderType.ARRAY_CLOSE
             name = self._last_array_name
 
-        header = Header(column, name, header_type, optional=optional)
+        header = Header(column, name, header_type,
+                        optional=optional, anonymous=anonymous)
         if self._last_dict_name is not None:
             self.dicts[self._last_dict_name].append(header)
         elif self._last_array_name is not None:
@@ -339,15 +349,26 @@ class ExcelSheet:
         arr = []
         read_rows_count = 0
         data_row = cursor.row
+        anonymous = headers[0].anonymous
         while data_row <= self.sheet.max_row:
-            d = dict()
+            dict_at_row = dict()
+            arr_at_row = []
             for i in range(1, len_of_headers - 1):
                 header = headers[i]
                 val = self._val(header.column, data_row)
-                if val is not None:
-                    d[header.name] = val
-            if (len(d) > 0):
-                arr.append(d)
+                if val is None:
+                    continue
+
+                if anonymous:
+                    arr_at_row.append(val)
+                else:
+                    dict_at_row[header.name] = val
+
+            if anonymous and len(arr_at_row) > 0:
+                arr.extend(arr_at_row)
+            elif len(dict_at_row) > 0:
+                arr.append(dict_at_row)
+
             read_rows_count = read_rows_count + 1
 
             val = self._val(headers[-1].column, data_row)
