@@ -470,19 +470,22 @@ def export_all_to_json(all):
             print("")
 
 
-def main():
-    if len(sys.argv) < 2:
-        help()
-        sys.exit(1)
+def export_file(filename):
+    all = load_all_rows_in_workbook(filename)
+    export_all_to_json(all)
 
-    names = sys.argv[1]
+
+def export_files(names):
     for filename in glob.glob(names):
         basename = os.path.basename(filename)
         if basename[0] == "~" or basename[0] == ".":
             continue
-        all = load_all_rows_in_workbook(filename)
-        export_all_to_json(all)
+        export_file(filename)
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) < 2:
+        help()
+        sys.exit(1)
+    names = sys.argv[1]
+    export_files(names)
