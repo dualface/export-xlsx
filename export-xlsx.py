@@ -70,6 +70,11 @@ class DocumentSchema():
 
         # 列头所在行
         self.header_row = int(configs["header_row"])
+        # 列头所在的列
+        if "header_col" in configs:
+            self.header_col = int(configs["header_col"])
+        else:
+            self.header_col = 1
         # 数据起始行
         self.first_data_row = int(configs["first_data_row"])
 
@@ -91,6 +96,7 @@ class DocumentSchema():
         print(f"    output: {self.output}")
         print(f"    indexes: {self.index_names}")
         print(f"    header_row: {self.header_row}")
+        print(f"    header_col: {self.header_col}")
         print(f"    first_data_row: {self.first_data_row}")
         print("")
 
@@ -189,6 +195,7 @@ class ExcelSheet:
 
     def __init__(self, sheet):
         self.sheet = sheet
+        self.grid = self._fetch_cells()
         self.schema = DocumentSchema(self._fetch_configs())
         self._fetch_headers()
 
@@ -260,14 +267,12 @@ class ExcelSheet:
 
     def _val_with_coordinate(self, column, row):
         """返回指定单元格的值及单元格的坐标，如果有必要则转换为数字"""
-        cell = self.sheet.cell(column=column, row=row)
         coordinate = get_column_letter(column) + str(row)
-        return self._convert_val(cell.value), coordinate
+        return self._convert_val(self.grid[row][column]), coordinate
 
     def _val(self, column, row):
         """返回指定单元格的值，如果有必要则转换为数字"""
-        cell = self.sheet.cell(column=column, row=row)
-        return self._convert_val(cell.value)
+        return self._convert_val(self.grid[row][column])
 
     def _load_record(self, cursor):
         """载入一条记录
@@ -401,13 +406,23 @@ class ExcelSheet:
 
     def _fetch_headers(self):
         """从工作表中读取列头信息"""
-        for column in range(1, self.sheet.max_column + 1):
+        for column in range(self.schema.header_col, self.sheet.max_column + 1):
             name = self._val(column, self.schema.header_row)
             if name == None:
                 continue
             self.schema.add_header(column, name)
         for index_name in self.schema.index_names:
             self.schema.add_index(index_name)
+
+    def _fetch_cells(self):
+        """将工作表的所有单元格全部载入内存，方便后续快速查询"""
+        grid = dict()
+        for row_index, row in enumerate(self.sheet.rows):
+            row_in_grid = dict()
+            grid[row_index + 1] = row_in_grid
+            for col_index, cell in enumerate(row):
+                row_in_grid[col_index + 1] = cell.value
+        return grid
 
 
 def help():
@@ -422,7 +437,7 @@ examples:
 """)
 
 
-def load_all_rows_in_workbook(filename):
+def load_all_rows_in_workbook(filename, verbose):
     """打开工作薄，遍历所有工作表，载入数据
 
     1. 遍历每一个工作表，读取工作表的 A1 单元格
@@ -434,7 +449,7 @@ def load_all_rows_in_workbook(filename):
     7. 最后返回 all 字典
     """
     print(f"load file '{os.path.basename(filename)}'")
-    wb = load_workbook(filename=filename, read_only=True)
+    wb = load_workbook(filename=filename, data_only=True, read_only=True)
 
     # 从工作薄中载入的所有数据
     # filename => rows_dict
@@ -445,7 +460,8 @@ def load_all_rows_in_workbook(filename):
             continue
 
         configSheet = ExcelSheet(sheet)
-        configSheet.schema.dumps()
+        if verbose:
+            configSheet.schema.dumps()
         records = configSheet.load_records()
         indexed = configSheet.make_indexed_records(records)
         name = configSheet.schema.output
@@ -457,6 +473,7 @@ def load_all_rows_in_workbook(filename):
 
     if len(all) == 0:
         print("skipped.")
+        print("")
 
     return all
 
@@ -470,17 +487,17 @@ def export_all_to_json(all):
             print("")
 
 
-def export_file(filename):
-    all = load_all_rows_in_workbook(filename)
+def export_file(filename, verbose):
+    all = load_all_rows_in_workbook(filename, verbose)
     export_all_to_json(all)
 
 
-def export_files(names):
+def export_files(names, verbose):
     for filename in glob.glob(names):
         basename = os.path.basename(filename)
         if basename[0] == "~" or basename[0] == ".":
             continue
-        export_file(filename)
+        export_file(filename, verbose)
 
 
 if __name__ == "__main__":
@@ -488,4 +505,8 @@ if __name__ == "__main__":
         help()
         sys.exit(1)
     names = sys.argv[1]
-    export_files(names)
+    if len(sys.argv) > 2 and sys.argv[2] == "-q":
+        verbose = False
+    else:
+        verbose = True
+    export_files(names, verbose)
