@@ -30,19 +30,21 @@ Excel 文件的格式要求：
 output: level_configs.json
 index: levelID
 header_row: 4
+header_col: 1
 first_data_row: 5
 ```
 
 -   `output`: 指定输出的 JSON 文件
 -   `index`: 指定输出 JSON 时使用哪些字段进行索引
 -   `header_row`: 列头所在的行，定义了每一条数据包含哪些字段
+-   `header_col`: 列头所在的起始列，定义第一个字段从哪一列开始
 -   `first_data_row`: 数据的开始行
 
 ~
 
 ## 列头和数据
 
-在工作表中，在 `header_row` 指定的行，从第一列开始定义列头。每一个列头定义数据里的一个字段。
+在工作表中，在 `header_row` 指定的行，从 `header_col` 指定列开始定义列头。每一个列头定义数据里的一个字段。如果列头内容为空，则跳过这一列。
 
 从 `first_data_row` 指定的行开始，从第一列开始填写数据。每一行对应一条数据。
 
@@ -56,6 +58,7 @@ first_data_row: 5
   1 |  output: level_configs.json
     |  index: levelID
     |  header_row: 4
+    |  header_col: 1
     |  first_data_row: 5
     +------------+----------+------------
   2 |            |          |
