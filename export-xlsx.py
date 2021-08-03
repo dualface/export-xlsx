@@ -53,18 +53,21 @@ class DocumentSchema:
     """规格定义"""
 
     def __init__(self, configs):
-        for key in ("output", "index", "header_row", "first_data_row"):
+        for key in ("output", "header_row", "first_data_row"):
             if key not in configs:
                 raise KeyError(f"Schema(): not found {key} in configs")
 
         # 输出文件名
         self.output = configs["output"]
         # 索引列表
-        self.index_names = list(map(str.strip, configs["index"].split(",")))
-        if len(self.index_names) < 1:
-            raise KeyError("must have least one index")
-        if len(self.index_names) > 2:
-            raise KeyError("at most have two indexes")
+        if "index" in configs:
+            self.index_names = list(map(str.strip, configs["index"].split(",")))
+            if len(self.index_names) < 1:
+                raise KeyError("must have least one index")
+            if len(self.index_names) > 2:
+                raise KeyError("at most have two indexes")
+        else:
+            self.index_names = list()
 
         # 列头所在行
         self.header_row = int(configs["header_row"])
@@ -94,7 +97,8 @@ class DocumentSchema:
         """输出配置信息"""
         print("Schema:")
         print(f"    output: {self.output}")
-        print(f"    indexes: {self.index_names}")
+        if len(self.index_names) > 0:
+            print(f"    indexes: {self.index_names}")
         print(f"    header_row: {self.header_row}")
         print(f"    header_type_row: {self.header_type_row}")
         print(f"    header_col: {self.header_col}")
@@ -478,13 +482,17 @@ def load_all_rows_in_workbook(filename, verbose):
         if verbose:
             sheet.schema.dumps()
         records = sheet.load_records()
-        indexed = sheet.make_indexed_records(records)
+
         name = sheet.schema.output
-        if name in all_rows:
-            for key in indexed:
-                all_rows[name][key] = indexed[key]
+        if len(sheet.schema.index_names) > 0:
+            indexed = sheet.make_indexed_records(records)
+            if name in all_rows:
+                for key in indexed:
+                    all_rows[name][key] = indexed[key]
+            else:
+                all_rows[name] = indexed
         else:
-            all_rows[name] = indexed
+            all_rows[name] = records
 
     if len(all_rows) == 0:
         print("skipped.")
