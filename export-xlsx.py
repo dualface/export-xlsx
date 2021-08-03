@@ -3,9 +3,7 @@ import glob
 import json
 import os
 import sys
-import traceback
 from enum import Enum
-from enum import auto as EnumAuto
 
 from openpyxl import load_workbook
 from openpyxl.utils.cell import get_column_letter
@@ -22,27 +20,27 @@ github repo: https://github.com/dualface/export_xlsx
 class HeaderType(Enum):
     """定义列头的类型"""
     # 正常列头
-    NORMAL = EnumAuto()
+    NORMAL = 1
     # 定义字典开始
-    DICT_OPEN = EnumAuto()
+    DICT_OPEN = 2
     # 定义字典结束
-    DICT_CLOSE = EnumAuto()
+    DICT_CLOSE = 3
     # 定义数组开始
-    ARRAY_OPEN = EnumAuto()
+    ARRAY_OPEN = 4
     # 定义数组结束
-    ARRAY_CLOSE = EnumAuto()
+    ARRAY_CLOSE = 5
 
 
 class Header:
     """封装数据表格的单个列头"""
 
-    def __init__(self, column, name, type, optional=False, anonymous=False):
+    def __init__(self, column, name, column_type, optional=False, anonymous=False):
         # 所在列
         self.column = column
         # 字段名
         self.name = name
         # 列头类型
-        self.type = type
+        self.type = column_type
         # 是否是可选列
         self.optional = optional
         # 是否是索引
@@ -51,7 +49,7 @@ class Header:
         self.anonymous = anonymous
 
 
-class DocumentSchema():
+class DocumentSchema:
     """规格定义"""
 
     def __init__(self, configs):
@@ -70,6 +68,8 @@ class DocumentSchema():
 
         # 列头所在行
         self.header_row = int(configs["header_row"])
+        # 列头类型所在行
+        self.header_type_row = int(configs["header_type_row"])
         # 列头所在的列
         if "header_col" in configs:
             self.header_col = int(configs["header_col"])
@@ -96,6 +96,7 @@ class DocumentSchema():
         print(f"    output: {self.output}")
         print(f"    indexes: {self.index_names}")
         print(f"    header_row: {self.header_row}")
+        print(f"    header_type_row: {self.header_type_row}")
         print(f"    header_col: {self.header_col}")
         print(f"    first_data_row: {self.first_data_row}")
         print("")
@@ -131,18 +132,18 @@ class DocumentSchema():
         if anonymous:
             name = name[1:]
 
-        last_char = name[len(name)-1]
+        last_char = name[len(name) - 1]
         if anonymous and last_char != "[":
             raise TypeError(f"only array can be anonymous")
 
         header_type = HeaderType.NORMAL
 
         if last_char == "{" or last_char == "[":
-            name = name[0:len(name)-1]
+            name = name[0:len(name) - 1]
 
-        optional = name[len(name)-1] == "?"
+        optional = name[len(name) - 1] == "?"
         if optional:
-            name = name[0:len(name)-1]
+            name = name[0:len(name) - 1]
 
         if last_char == "{":
             header_type = HeaderType.DICT_OPEN
@@ -202,7 +203,7 @@ class ExcelSheet:
     def load_records(self):
         """载入行
 
-        1. 从 first_data_row 行的第一列开始，往右顺序读取字段值。
+        1. 从 first_data_row, header_col 开始，往右顺序读取字段值。
         2. 当遇到 DICT_OPEN 或者 ARRAY_OPEN 时，则开始读取 DICT 或 ARRAY 定义的区域。
         3. 读取区域完成后，从当前行继续往右读取字段值。
         4. 最后构造包含当前记录所有字段的字典。
@@ -211,7 +212,7 @@ class ExcelSheet:
         records = []
         cursor = SheetCursor(1, self.schema.first_data_row)
         while cursor.row <= self.sheet.max_row:
-            if self._val(1, cursor.row) is None:
+            if self._val(self.schema.header_col, cursor.row) is None:
                 cursor.row = cursor.row + 1
                 continue
             record = self._load_record(cursor)
@@ -244,7 +245,8 @@ class ExcelSheet:
 
     # private
 
-    def _convert_val(self, val):
+    @staticmethod
+    def _convert_val(val):
         """转换单元格的值"""
         if val is None:
             return None
@@ -258,12 +260,10 @@ class ExcelSheet:
             return False
         elif str.isnumeric(val):
             return int(val)
-        else:
-            try:
-                return round(float(val), 4)
-            except:
-                pass
-        return val
+        try:
+            return round(float(val), 4)
+        finally:
+            return val
 
     def _val_with_coordinate(self, column, row):
         """返回指定单元格的值及单元格的坐标，如果有必要则转换为数字"""
@@ -317,7 +317,7 @@ class ExcelSheet:
     def _fetch_dict(self, headers, cursor, optional):
         """读取当前行内指定的字典"""
         len_of_headers = len(headers)
-        cursor.column = headers[len_of_headers - 1].column+1
+        cursor.column = headers[len_of_headers - 1].column + 1
 
         val, coordinate = self._val_with_coordinate(
             headers[0].column, cursor.row)
@@ -342,7 +342,7 @@ class ExcelSheet:
     def _fetch_array(self, headers, cursor, optional):
         """从光标位置开始读取包含多个字典的数组"""
         len_of_headers = len(headers)
-        cursor.column = headers[len_of_headers - 1].column+1
+        cursor.column = headers[len_of_headers - 1].column + 1
 
         val, coordinate = self._val_with_coordinate(
             headers[0].column, cursor.row)
@@ -408,7 +408,7 @@ class ExcelSheet:
         """从工作表中读取列头信息"""
         for column in range(self.schema.header_col, self.sheet.max_column + 1):
             name = self._val(column, self.schema.header_row)
-            if name == None:
+            if name is None:
                 continue
             self.schema.add_header(column, name)
         for index_name in self.schema.index_names:
@@ -425,7 +425,7 @@ class ExcelSheet:
         return grid
 
 
-def help():
+def print_help():
     print("""
 usage: python3 export_xlsx.py FILENAME
 
@@ -440,7 +440,7 @@ examples:
 def load_all_rows_in_workbook(filename, verbose):
     """打开工作薄，遍历所有工作表，载入数据
 
-    1. 遍历每一个工作表，读取工作表的 A1 单元格
+    1. 遍历每一个工作表，读取工作表 A1 单元格
     2. 如果 A1 单元格不为空，则假定为工作表的导出设置
     3. 读取工作表内定义的列头
     4. 读取工作表的数据
@@ -453,43 +453,44 @@ def load_all_rows_in_workbook(filename, verbose):
 
     # 从工作薄中载入的所有数据
     # filename => rows_dict
-    all = dict()
+    all_rows = dict()
     for sheet_name in wb.sheetnames:
-        sheet = wb[sheet_name]
-        if sheet.max_row < 1 or sheet["A1"].value is None:
+        sheet_instance = wb[sheet_name]
+        if sheet_instance.max_row < 1 or sheet_instance["A1"].value is None:
+            print(f"not found configs in sheet {sheet_name}")
             continue
 
-        configSheet = ExcelSheet(sheet)
+        sheet = ExcelSheet(sheet_instance)
         if verbose:
-            configSheet.schema.dumps()
-        records = configSheet.load_records()
-        indexed = configSheet.make_indexed_records(records)
-        name = configSheet.schema.output
-        if name in all:
+            sheet.schema.dumps()
+        records = sheet.load_records()
+        indexed = sheet.make_indexed_records(records)
+        name = sheet.schema.output
+        if name in all_rows:
             for key in indexed:
-                all[name][key] = indexed[key]
+                all_rows[name][key] = indexed[key]
         else:
-            all[name] = indexed
+            all_rows[name] = indexed
 
-    if len(all) == 0:
+    if len(all_rows) == 0:
         print("skipped.")
         print("")
 
-    return all
+    return all_rows
 
 
-def export_all_to_json(all):
+def export_all_to_json(all_rows):
     """导出所有数据为 JSON 文件"""
-    for output in all:
+    for output in all_rows:
         with open(output, "w") as f:
             print(f"write file '{output}'")
-            f.write(json.dumps(all[output], indent=4))
+            f.write(json.dumps(all_rows[output], indent=4))
             print("")
 
 
 def export_file(filename, verbose):
-    all = load_all_rows_in_workbook(filename, verbose)
-    export_all_to_json(all)
+    all_rows = load_all_rows_in_workbook(filename, verbose)
+    export_all_to_json(all_rows)
 
 
 def export_files(names, verbose):
@@ -500,9 +501,9 @@ def export_files(names, verbose):
         export_file(filename, verbose)
 
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) < 2:
-        help()
+        print_help()
         sys.exit(1)
     names = sys.argv[1]
     if len(sys.argv) > 2 and sys.argv[2] == "-q":
@@ -510,3 +511,7 @@ if __name__ == "__main__":
     else:
         verbose = True
     export_files(names, verbose)
+
+
+if __name__ == "__main__":
+    main()
