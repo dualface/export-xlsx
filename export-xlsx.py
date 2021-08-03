@@ -99,7 +99,6 @@ class DocumentSchema:
         print(f"    header_type_row: {self.header_type_row}")
         print(f"    header_col: {self.header_col}")
         print(f"    first_data_row: {self.first_data_row}")
-        print("")
 
         indent = ""
         for header in self.headers:
@@ -384,11 +383,23 @@ class ExcelSheet:
 
         return arr, read_rows_count
 
+    def _find_configs_cell(self):
+        """将表格中第一个非空的单元格视为配置文件所在单元格"""
+        num_rows = len(self.grid)
+        for row in range(1, num_rows):
+            num_cols = len(self.grid[row])
+            for col in range(1, num_cols):
+                val = self._val(col, row)
+                if val is not None:
+                    return col, row
+        return None
+
     def _fetch_configs(self):
         """从工作表中读取导出配置"""
-        val = self._val(1, 1)
-        if val is None:
-            raise TypeError("not found configs")
+        col, row = self._find_configs_cell()
+        if col is None:
+            raise SyntaxError("not found configs")
+        val = self._val(col, row)
 
         # 导出配置分为多行
         configs = dict()
@@ -456,11 +467,14 @@ def load_all_rows_in_workbook(filename, verbose):
     all_rows = dict()
     for sheet_name in wb.sheetnames:
         sheet_instance = wb[sheet_name]
-        if sheet_instance.max_row < 1 or sheet_instance["A1"].value is None:
-            print(f"not found configs in sheet {sheet_name}")
+        try:
+            print(f"load sheet {sheet_name}")
+            sheet = ExcelSheet(sheet_instance)
+        except SyntaxError:
+            print(f"[ERROR] not found configs in sheet {sheet_name}")
+            print("")
             continue
 
-        sheet = ExcelSheet(sheet_instance)
         if verbose:
             sheet.schema.dumps()
         records = sheet.load_records()
@@ -485,7 +499,7 @@ def export_all_to_json(all_rows):
         with open(output, "w") as f:
             print(f"write file '{output}'")
             f.write(json.dumps(all_rows[output], indent=4))
-            print("")
+    print("")
 
 
 def export_file(filename, verbose):
