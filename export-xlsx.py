@@ -261,40 +261,14 @@ class ExcelSheet:
 
     # private
 
-    @staticmethod
-    def _convert_val(val, val_type):
-        """转换单元格的值"""
-        if val is None:
-            return None
-        val = str(val).strip()
-        if val_type == "string":
-            return val
-
-        if val_type == "vec2":
-            return {}
-
-        val_lower = val.lower()
-        if val_lower == "null":
-            return None
-        elif val_lower == "true":
-            return True
-        elif val_lower == "false":
-            return False
-        elif str.isnumeric(val):
-            return int(val)
-        try:
-            return round(float(val), 4)
-        finally:
-            return val
-
     def _val_with_coordinate(self, column, row, val_type="auto"):
         """返回指定单元格的值及单元格的坐标，如果有必要则转换为数字"""
         coordinate = get_column_letter(column) + str(row)
-        return self._convert_val(self.grid[row][column], val_type), coordinate
+        return _convert_val(self.grid[row][column], val_type), coordinate
 
     def _val(self, column, row, val_type="auto"):
         """返回指定单元格的值，如果有必要则转换为数字"""
-        return self._convert_val(self.grid[row][column], val_type)
+        return _convert_val(self.grid[row][column], val_type)
 
     def _load_record(self, cursor):
         """载入一条记录
@@ -453,6 +427,71 @@ class ExcelSheet:
             for col_index, cell in enumerate(row):
                 row_in_grid[col_index + 1] = cell.value
         return grid
+
+
+def _convert_val_auto(val):
+    """转换单元格的值"""
+    if val is None:
+        return None
+    val = str(val).strip()
+    val_lower = val.lower()
+    if val_lower == "null":
+        return None
+    elif val_lower == "true":
+        return True
+    elif val_lower == "false":
+        return False
+    elif str.isnumeric(val):
+        return int(val)
+    try:
+        return round(float(val), 4)
+    finally:
+        return val
+
+
+def _convert_val_vec2(val, is_int=False):
+    sep = ","
+    if val.find("x") != -1:
+        sep = "x"
+    elif val.find(":") != -1:
+        sep = ":"
+
+    parts = list(map(str.strip, val.split(sep)))
+    if len(parts) != 2:
+        raise TypeError(f"val {val} is not vec2")
+
+    if is_int:
+        return {"x": int(parts[0]), "y": int(parts[1])}
+    else:
+        return {"x": float(parts[0]), "y": float(parts[1])}
+
+
+def _convert_val(val, val_type):
+    """转换单元格的值"""
+    if val_type == "auto":
+        return _convert_val_auto(val)
+
+    if val_type == "string":
+        return val
+
+    if val_type == "int":
+        return int(val)
+
+    if val_type == "float":
+        return float(val)
+
+    if val_type == "bool":
+        if val.lower() == "true":
+            return True
+        else:
+            return False
+
+    if val_type == "vec2":
+        return _convert_val_vec2(val)
+    if val_type == "vec2int":
+        return _convert_val_vec2(val, is_int=True)
+
+    raise TypeError(f"unsupport val_type {val_type}")
 
 
 def print_help():
