@@ -511,7 +511,7 @@ def load_all_rows_in_workbook(filename, verbose):
 def export_all_to_json(all_rows):
     """导出所有数据为 JSON 文件"""
     for output in all_rows:
-        with open(output, "w") as f:
+        with open(output, "w", newline='\n') as f:
             print(f"write file '{output}'")
             f.write(json.dumps(all_rows[output], indent=4))
     print("")
