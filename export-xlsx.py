@@ -68,7 +68,11 @@ class DocumentSchema:
                 raise KeyError("at most have two indexes")
         else:
             self.index_names = list()
-
+        # 外层对象封装字段
+        if "wrapper_field" in configs:
+            self.wrapper_field = configs["wrapper_field"]
+        else:
+            self.wrapper_field = None
         # 列头所在行
         self.header_row = int(configs["header_row"])
         # 列头类型所在行
@@ -469,16 +473,17 @@ def load_all_rows_in_workbook(filename, verbose):
     # 从工作薄中载入的所有数据
     # filename => rows_dict
     all_rows = dict()
+    sheets = dict()
     for sheet_name in wb.sheetnames:
         sheet_instance = wb[sheet_name]
         try:
             print(f"load sheet {sheet_name}")
             sheet = ExcelSheet(sheet_instance)
+            sheets[sheet_name] = sheet
         except SyntaxError:
             print(f"[ERROR] not found configs in sheet {sheet_name}")
             print("")
             continue
-
         if verbose:
             sheet.schema.dumps()
         records = sheet.load_records()
@@ -492,6 +497,8 @@ def load_all_rows_in_workbook(filename, verbose):
             else:
                 all_rows[name] = indexed
         else:
+            if sheet.schema.wrapper_field is not None:
+                records = {sheet.schema.wrapper_field: records}
             all_rows[name] = records
 
     if len(all_rows) == 0:
