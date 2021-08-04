@@ -34,13 +34,16 @@ class HeaderType(Enum):
 class Header:
     """封装数据表格的单个列头"""
 
-    def __init__(self, column, name, column_type, optional=False, anonymous=False):
+    def __init__(self, column, name, column_type,
+                 val_type="auto", optional=False, anonymous=False):
         # 所在列
         self.column = column
         # 字段名
         self.name = name
         # 列头类型
         self.type = column_type
+        # 列头值类型
+        self.val_type = val_type
         # 是否是可选列
         self.optional = optional
         # 是否是索引
@@ -76,7 +79,10 @@ class DocumentSchema:
         # 列头所在行
         self.header_row = int(configs["header_row"])
         # 列头类型所在行
-        self.header_type_row = int(configs["header_type_row"])
+        if "header_type_row" in configs:
+            self.header_type_row = int(configs["header_type_row"])
+        else:
+            self.header_type_row = None
         # 列头所在的列
         if "header_col" in configs:
             self.header_col = int(configs["header_col"])
@@ -114,22 +120,19 @@ class DocumentSchema:
             if header.optional:
                 optional = " OPTIONAL"
             if header.type == HeaderType.DICT_OPEN:
-                print(
-                    f"column [{header.column:>2}]: {header.name}{optional} DICT {{")
+                print(f"column [{header.column:>2}]: {header.name}{optional} DICT {{")
                 indent = "    "
             elif header.type == HeaderType.DICT_CLOSE:
                 print(f"column [{header.column:>2}]: }}")
                 indent = ""
             elif header.type == HeaderType.ARRAY_OPEN:
-                print(
-                    f"column [{header.column:>2}]: {header.name}{optional} ARRAY [")
+                print(f"column [{header.column:>2}]: {header.name}{optional} ARRAY [")
                 indent = "    "
             elif header.type == HeaderType.ARRAY_CLOSE:
                 print(f"column [{header.column:>2}]: ]")
                 indent = ""
             else:
-                print(
-                    f"column [{header.column:>2}]: {indent}{header.name}{optional}")
+                print(f"column [{header.column:>2}]: {indent}{header.name}{optional}")
         print("")
 
     def add_header(self, column, name):
@@ -138,6 +141,13 @@ class DocumentSchema:
         anonymous = name[0] == "#"
         if anonymous:
             name = name[1:]
+
+        # 查找类型定义
+        val_type = "auto"
+        type_pos = name.find(":")
+        if type_pos > 0:
+            val_type = name[type_pos + 1:]
+            name = name[0:type_pos]
 
         last_char = name[len(name) - 1]
         if anonymous and last_char != "[":
@@ -168,7 +178,7 @@ class DocumentSchema:
             name = self._last_array_name
 
         header = Header(column, name, header_type,
-                        optional=optional, anonymous=anonymous)
+                        val_type=val_type, optional=optional, anonymous=anonymous)
         if self._last_dict_name is not None:
             self.dicts[self._last_dict_name].append(header)
         elif self._last_array_name is not None:
@@ -229,8 +239,7 @@ class ExcelSheet:
     def make_indexed_records(self, records):
         """根据索引构建索引后的分组记录集"""
         indexed_rows = dict()
-        last_index_name = self.schema.index_names[len(
-            self.schema.index_names) - 1]
+        last_index_name = self.schema.index_names[len(self.schema.index_names) - 1]
         for row in records:
             index_value = row[last_index_name]
             indexed_rows[index_value] = row
@@ -253,11 +262,17 @@ class ExcelSheet:
     # private
 
     @staticmethod
-    def _convert_val(val):
+    def _convert_val(val, val_type):
         """转换单元格的值"""
         if val is None:
             return None
         val = str(val).strip()
+        if val_type == "string":
+            return val
+
+        if val_type == "vec2":
+            return {}
+
         val_lower = val.lower()
         if val_lower == "null":
             return None
@@ -272,14 +287,14 @@ class ExcelSheet:
         finally:
             return val
 
-    def _val_with_coordinate(self, column, row):
+    def _val_with_coordinate(self, column, row, val_type="auto"):
         """返回指定单元格的值及单元格的坐标，如果有必要则转换为数字"""
         coordinate = get_column_letter(column) + str(row)
-        return self._convert_val(self.grid[row][column]), coordinate
+        return self._convert_val(self.grid[row][column], val_type), coordinate
 
-    def _val(self, column, row):
+    def _val(self, column, row, val_type="auto"):
         """返回指定单元格的值，如果有必要则转换为数字"""
-        return self._convert_val(self.grid[row][column])
+        return self._convert_val(self.grid[row][column], val_type)
 
     def _load_record(self, cursor):
         """载入一条记录
@@ -306,13 +321,11 @@ class ExcelSheet:
                     record[name] = val
                 cursor.column = cursor.column + 1
             elif header.type == HeaderType.DICT_OPEN:
-                val = self._fetch_dict(
-                    self.schema.dicts[name], cursor, header.optional)
+                val = self._fetch_dict(self.schema.dicts[name], cursor, header)
                 if (not header.optional) or len(val) > 0:
                     record[name] = val
             elif header.type == HeaderType.ARRAY_OPEN:
-                arr, read_rows_count = self._fetch_array(
-                    self.schema.arrays[name], cursor, header.optional)
+                arr, read_rows_count = self._fetch_array(self.schema.arrays[name], cursor, header)
                 if (not header.optional) or len(arr) > 0:
                     record[name] = arr
                 if read_rows_count > max_move_row:
@@ -326,21 +339,20 @@ class ExcelSheet:
         len_of_headers = len(headers)
         cursor.column = headers[len_of_headers - 1].column + 1
 
-        val, coordinate = self._val_with_coordinate(
-            headers[0].column, cursor.row)
+        val, coordinate = self._val_with_coordinate(headers[0].column, cursor.row)
         if val != "{":
             if optional:
                 return dict()
             raise TypeError(f"cell at <{coordinate}> is not dict begin")
-        val, coordinate = self._val_with_coordinate(
-            headers[-1].column, cursor.row)
+
+        val, coordinate = self._val_with_coordinate(headers[-1].column, cursor.row)
         if val != "}":
             raise TypeError(f"cell at <{coordinate}> is not dict end")
 
         dict_at_row = dict()
         for i in range(1, len_of_headers - 1):
             header = headers[i]
-            val = self._val(header.column, cursor.row)
+            val = self._val(header.column, cursor.row, header.val_type)
             if val is not None:
                 dict_at_row[header.name] = val
 
@@ -351,8 +363,7 @@ class ExcelSheet:
         len_of_headers = len(headers)
         cursor.column = headers[len_of_headers - 1].column + 1
 
-        val, coordinate = self._val_with_coordinate(
-            headers[0].column, cursor.row)
+        val, coordinate = self._val_with_coordinate(headers[0].column, cursor.row)
         if val != "{" and val != "[":
             if optional:
                 return [], 1
@@ -367,7 +378,7 @@ class ExcelSheet:
             arr_at_row = []
             for i in range(1, len_of_headers - 1):
                 header = headers[i]
-                val = self._val(header.column, data_row)
+                val = self._val(header.column, data_row, header.val_type)
                 if val is None:
                     continue
 
