@@ -290,7 +290,7 @@ class ExcelSheet:
 
             name = header.name
             if header.type == HeaderType.NORMAL:
-                val = self._val(header.column, cursor.row)
+                val = self._val(header.column, cursor.row, header.val_type)
                 if (not header.optional) or (val is not None):
                     record[name] = val
                 cursor.column = cursor.column + 1
@@ -491,7 +491,7 @@ def _convert_val(val, val_type):
     if val_type == "vec2int":
         return _convert_val_vec2(val, is_int=True)
 
-    raise TypeError(f"unsupport val_type {val_type}")
+    raise TypeError(f"unsupported val_type {val_type}")
 
 
 def print_help():
