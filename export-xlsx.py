@@ -13,7 +13,7 @@ from openpyxl.utils.cell import get_column_letter
 
 COPYRIGHT 2021 ALL RESERVED. (C) liaoyulei, https://github.com/dualface
 
-github repo: https://github.com/dualface/export_xlsx
+github repo: https://github.com/dualface/export-xlsx
 """
 
 
@@ -78,11 +78,6 @@ class DocumentSchema:
             self.wrapper_field = None
         # 列头所在行
         self.header_row = int(configs["header_row"])
-        # 列头类型所在行
-        if "header_type_row" in configs:
-            self.header_type_row = int(configs["header_type_row"])
-        else:
-            self.header_type_row = None
         # 列头所在的列
         if "header_col" in configs:
             self.header_col = int(configs["header_col"])
@@ -109,8 +104,9 @@ class DocumentSchema:
         print(f"    output: {self.output}")
         if len(self.index_names) > 0:
             print(f"    indexes: {self.index_names}")
+        if self.wrapper_field is not None:
+            print(f"    wrapper_field: {self.wrapper_field}")
         print(f"    header_row: {self.header_row}")
-        print(f"    header_type_row: {self.header_type_row}")
         print(f"    header_col: {self.header_col}")
         print(f"    first_data_row: {self.first_data_row}")
 
@@ -132,7 +128,10 @@ class DocumentSchema:
                 print(f"column [{header.column:>2}]: ]")
                 indent = ""
             else:
-                print(f"column [{header.column:>2}]: {indent}{header.name}{optional}")
+                header_val_type = ""
+                if header.val_type != "auto":
+                    header_val_type = f": <{header.val_type}>"
+                print(f"column [{header.column:>2}]: {indent}{header.name}{header_val_type}{optional}")
         print("")
 
     def add_header(self, column, name):
@@ -177,8 +176,7 @@ class DocumentSchema:
             header_type = HeaderType.ARRAY_CLOSE
             name = self._last_array_name
 
-        header = Header(column, name, header_type,
-                        val_type=val_type, optional=optional, anonymous=anonymous)
+        header = Header(column, name, header_type, val_type=val_type, optional=optional, anonymous=anonymous)
         if self._last_dict_name is not None:
             self.dicts[self._last_dict_name].append(header)
         elif self._last_array_name is not None:
@@ -496,12 +494,23 @@ def _convert_val(val, val_type):
 
 def print_help():
     print("""
-usage: python3 export_xlsx.py FILENAME
+usage:
+
+    python3 export-xlsx.py [-q] [-i INDEX] FILENAME [MORE_FILES ...]
+    python3 export-xlsx.py [-q] [-i INDEX] *.xlsx
+
+options:
+
+    -q: keep quiet, display less messages
+    -i: gen indexes of all files, save to file name of INDEX
 
 examples:
 
-    python3 export_xlsx.py test.xlsx
-    python3 export_xlsx.py *.xlsx
+    # convert specified file
+    python3 export-xlsx.py test.xlsx
+
+    # convert *.xlsx, gen indexes of all files, save to index.json
+    python3 export-xlsx.py -i index.json *.xlsx
 
 """)
 
@@ -560,36 +569,61 @@ def load_all_rows_in_workbook(filename, verbose):
 
 def export_all_to_json(all_rows):
     """导出所有数据为 JSON 文件"""
+    index = []
     for output in all_rows:
         with open(output, "w", newline='\n') as f:
             print(f"write file '{output}'")
             f.write(json.dumps(all_rows[output], indent=4))
-    print("")
+        index.append(output)
+    return index
 
 
 def export_file(filename, verbose):
     all_rows = load_all_rows_in_workbook(filename, verbose)
-    export_all_to_json(all_rows)
+    return export_all_to_json(all_rows)
 
 
 def export_files(names, verbose):
+    index = []
     for filename in glob.glob(names):
         basename = os.path.basename(filename)
         if basename[0] == "~" or basename[0] == ".":
             continue
-        export_file(filename, verbose)
+        index[len(index):] = export_file(filename, verbose)
+    return index
 
 
 def main():
     if len(sys.argv) < 2:
         print_help()
         sys.exit(1)
-    names = sys.argv[1]
-    if len(sys.argv) > 2 and sys.argv[2] == "-q":
+    names = sys.argv[1:]
+    if len(names) > 1 and names[0] == "-q":
         verbose = False
+        names = names[1:]
     else:
         verbose = True
-    export_files(names, verbose)
+    if len(names) > 2 and names[0] == "-i":
+        index_filename = names[1]
+        names = names[2:]
+    else:
+        index_filename = None
+
+    index = []
+    for name in names:
+        index[len(index):] = export_files(name, verbose)
+
+    if index_filename is not None:
+        output_index = []
+        for filename in index:
+            if len(filename) > 0:
+                output_index.append(filename)
+
+        with open(index_filename, "w", newline='\n') as f:
+            print(f"write index file '{index_filename}'")
+            f.write(json.dumps(dict({"index": output_index}), indent=4))
+
+    print("done.")
 
 
 if __name__ == "__main__":

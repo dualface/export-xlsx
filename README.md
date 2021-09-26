@@ -22,13 +22,30 @@ Excel 文件的格式要求：
 
 ~
 
+## 使用方法
+
+使用时，要转换的 Excel 文件需要按要求添加导出配置，然后使用命令行：
+
+```bash
+python3 export-xlsx.py test.xlsx
+```
+
+如果要一次性转换多个 Excel 文件，可以添加更多文件名到命令行中，或者使用通配符。例如：
+
+```bash
+python3 export-xlsx.py *.xlsx
+```
+
+~
+
+
 ## 导出配置
 
 导出配置必须位于工作表的 A1 单元格，参考内容如下：
 
 ```
 output: level_configs.json
-index: levelID
+index: levelId
 header_row: 4
 header_col: 1
 first_data_row: 5
@@ -36,6 +53,7 @@ first_data_row: 5
 
 -   `output`: 指定输出的 JSON 文件
 -   `index`: 指定输出 JSON 时使用哪些字段进行索引
+-   `wrapper_field`: 将所有数据包装到为一个字典中的一个数组，`wrapper_field` 指定字段名，注意这个设置仅在没有设置 `index` 时生效
 -   `header_row`: 列头所在的行，定义了每一条数据包含哪些字段
 -   `header_col`: 列头所在的起始列，定义第一个字段从哪一列开始
 -   `first_data_row`: 数据的开始行
@@ -56,7 +74,7 @@ first_data_row: 5
     #  A         |  B       |  C
     +------------+----------+------------
   1 |  output: level_configs.json
-    |  index: levelID
+    |  index: levelId
     |  header_row: 4
     |  header_col: 1
     |  first_data_row: 5
@@ -65,7 +83,7 @@ first_data_row: 5
     +------------+----------+------------
   3 |  配置每个级别的关卡会产生多少个 NPC
     +------------+----------+------------
-  4 |  levelID   |  NPCID   |  quantity
+  4 |  levelId   |  NpcId   |  quantity
     +------------+----------+------------
   5 |  LEVEL_01  |  NPC_01  |  100
   6 |  LEVEL_02  |  NPC_02  |  100
@@ -86,8 +104,8 @@ first_data_row: 5
 
 ```json
 "LEVEL_01": {
-    "levelID": "LEVEL_01",
-    "NPCID": "NPC_01",
+    "levelId": "LEVEL_01",
+    "NpcId": "NPC_01",
     "quantity": 100
 }
 ```
@@ -109,17 +127,52 @@ first_data_row: 5
 ```json
 {
     "LEVEL_01": {
-        "levelID": "LEVEL_01",
-        "NPCID": "NPC_01",
+        "levelId": "LEVEL_01",
+        "NpcId": "NPC_01",
         "quantity": 100
     },
     "LEVEL_02": {
-        "levelID": "LEVEL_02",
-        "NPCID": "NPC_02",
+        "levelId": "LEVEL_02",
+        "NpcId": "NPC_02",
         "quantity": 100
     }
 }
 ```
+
+~
+
+如果要将所有数据包装为一个包含数组，那么可以用 `wrapper_field` 设置。
+
+例如：
+
+```
+output: level_configs.json
+header_row: 4
+header_col: 1
+first_data_row: 5
+wrapper_field: array
+```
+
+输出的 JSON 格式将变成：
+
+```json
+{
+    "array": [
+        {
+            "levelId": "LEVEL_01",
+            "NpcId": "NPC_01",
+            "quantity": 100
+        },
+        {
+            "levelId": "LEVEL_02",
+            "NpcId": "NPC_02",
+            "quantity": 100
+        }
+    ]
+}
+```
+
+> 注意：`wrapper_field` 仅在 `index` 没有设置时生效。
 
 ~
 
@@ -133,7 +186,7 @@ first_data_row: 5
 示例：
 
 ```
-  levelID   |  NPCID   |  quantity?
+  levelId   |  NpcId   |  quantity?
 ------------+----------+-------------
   LEVEL_01  |  NPC_01  |  null
   LEVEL_02  |  NPC_02  |  100
@@ -145,17 +198,17 @@ first_data_row: 5
 ```json
 {
     "LEVEL_01": {
-        "levelID": "LEVEL_01",
-        "NPCID": "NPC_01"
+        "levelId": "LEVEL_01",
+        "NpcId": "NPC_01"
     },
     "LEVEL_02": {
-        "levelID": "LEVEL_02",
-        "NPCID": "NPC_02",
+        "levelId": "LEVEL_02",
+        "NpcId": "NPC_02",
         "quantity": 100
     },
     "LEVEL_03": {
-        "levelID": "LEVEL_03",
-        "NPCID": "NPC_03"
+        "levelId": "LEVEL_03",
+        "NpcId": "NPC_03"
     }
 }
 ```
@@ -440,7 +493,8 @@ AAAAAA  |  3      |              {  |  GOLD     |  300          |
             ]
         },
         "3": {
-            "techID": "AAAAAA",
+
+"techID": "AAAAAA",
             "level": 3,
             "upgradeCost": [
                 "GOLD",
@@ -462,5 +516,58 @@ AAAAAA  |  3      |              {  |  GOLD     |  300          |
 -   如果数组列头为可选，那么空数组将不会被包含在结果中。
 
 ~
+
+
+## 为字段指定类型
+
+默认情况下，会根据字段值转换为适当的类型。如果有需要，可以在字段名后面添加字段类型。字段名和类型之间用 ":" 分割。
+
+例如：
+
+```
+levelId   |  NpcId   |  quantity:string
+----------+----------+-------------------
+LEVEL_01  |  NPC_01  |  100
+```
+
+为 `quantity` 指定类型后，输出的 JSON 中，该字段的值就是字符串类型：
+
+```json
+"LEVEL_01": {
+    "levelId": "LEVEL_01",
+    "NpcId": "NPC_01",
+    "quantity": "100"
+}
+```
+
+目前支持的类型有：
+
+- `auto`: 自动判断，等同于不指定类型
+- `string`: 转换为字符串
+- `int`: 转换为整数
+- `float`: 转换为浮点数
+- `bool`: 转换为 boolean 类型
+- `vec2`: 输入格式是 x,y，输出为一个字典 `{"x": x, "y": y}`
+- `vec2int`: 输出格式同上，但转换为整数
+
+例如：
+
+```
+deviceId   |  size:vec2
+-----------+-------------
+DEVICE_01  |  10, 20
+```
+
+输出为：
+
+```json
+"DEVICE_01": {
+    "deviceId": "DEVICE_01",
+    "size": {
+        "x": 10.0,
+        "y": 20.0
+    }
+}
+```
 
 \-EOF\-
